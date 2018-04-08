@@ -60,18 +60,21 @@ int Emscripten_CreateWindowFramebuffer(_THIS, SDL_Window * window, Uint32 * form
 }
 
 static void
-Emscripten_UpdateWindowFramebufferWorker(SDL_Surface* surface)
+Emscripten_UpdateWindowFramebufferWorker(SDL_Surface * surface, const char * canvas_id)
 {
     EM_ASM_INT({
         var w = $0;
         var h = $1;
         var pixels = $2;
+        var canvasId = UTF8ToString($3);
+        var canvas = document.querySelector(canvasId);
 
+        //TODO: this should store a context per canvas
         if (!Module['SDL2']) Module['SDL2'] = {};
         var SDL2 = Module['SDL2'];
-        if (SDL2.ctxCanvas !== Module['canvas']) {
-            SDL2.ctx = Module['createContext'](Module['canvas'], false, true);
-            SDL2.ctxCanvas = Module['canvas'];
+        if (SDL2.ctxCanvas !== canvas) {
+            SDL2.ctx = Module['createContext'](canvas, false, true);
+            SDL2.ctxCanvas = canvas;
         }
         if (SDL2.w !== w || SDL2.h !== h || SDL2.imageCtx !== SDL2.ctx) {
             SDL2.image = SDL2.ctx.createImageData(w, h);
@@ -148,7 +151,7 @@ Emscripten_UpdateWindowFramebufferWorker(SDL_Surface* surface)
 
         SDL2.ctx.putImageData(SDL2.image, 0, 0);
         return 0;
-    }, surface->w, surface->h, surface->pixels);
+    }, surface->w, surface->h, surface->pixels, canvas_id);
 }
 
 int Emscripten_UpdateWindowFramebuffer(_THIS, SDL_Window * window, const SDL_Rect * rects, int numrects)
@@ -164,12 +167,13 @@ int Emscripten_UpdateWindowFramebuffer(_THIS, SDL_Window * window, const SDL_Rec
     /* Send the data to the display */
 
     if (emscripten_is_main_runtime_thread()) {
-        Emscripten_UpdateWindowFramebufferWorker(surface);
+        Emscripten_UpdateWindowFramebufferWorker(surface, data->canvas_id);
     } else {
         emscripten_sync_run_in_main_runtime_thread(
             EM_FUNC_SIG_VI,
             Emscripten_UpdateWindowFramebufferWorker,
-            (uint32_t)surface
+            (uint32_t)surface,
+            (uint32_t)data->canvas_id
         );
     }
 
