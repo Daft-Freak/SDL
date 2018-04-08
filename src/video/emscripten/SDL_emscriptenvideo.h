@@ -28,6 +28,11 @@
 #include <emscripten/emscripten.h>
 #include <emscripten/html5.h>
 
+typedef struct SDL_VideoData
+{
+    int num_windows;
+} SDL_VideoData;
+
 typedef struct SDL_WindowData
 {
     SDL_Window *window;
