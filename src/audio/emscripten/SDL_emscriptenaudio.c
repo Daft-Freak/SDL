@@ -26,37 +26,17 @@
 #include "SDL_emscriptenaudio.h"
 
 #include <emscripten/emscripten.h>
+#include <emscripten/webaudio.h>
 
-/* !!! FIXME: this currently expects that the audio callback runs in the main thread,
-   !!! FIXME:  in intervals when the application isn't running, but that may not be
-   !!! FIXME:  true always once pthread support becomes widespread. Revisit this code
-   !!! FIXME:  at some point and see what needs to be done for that! */
+static uint8_t audioThreadStack[4096];
 
-static void FeedAudioDevice(_THIS, const void *buf, const int buflen)
+static EM_BOOL AudioWorkletProcess(int numInputs, const AudioSampleFrame *inputs, int numOutputs, AudioSampleFrame *outputs,
+                      int numParams, const AudioParamFrame *params, void *userData)
 {
-    const int framelen = (SDL_AUDIO_BITSIZE(this->spec.format) / 8) * this->spec.channels;
-    /* *INDENT-OFF* */ /* clang-format off */
-    MAIN_THREAD_EM_ASM({
-        var SDL3 = Module['SDL3'];
-        var numChannels = SDL3.audio.currentOutputBuffer['numberOfChannels'];
-        for (var c = 0; c < numChannels; ++c) {
-            var channelData = SDL3.audio.currentOutputBuffer['getChannelData'](c);
-            if (channelData.length != $1) {
-                throw 'Web Audio output buffer length mismatch! Destination size: ' + channelData.length + ' samples vs expected ' + $1 + ' samples!';
-            }
-
-            for (var j = 0; j < $1; ++j) {
-                channelData[j] = HEAPF32[$0 + ((j*numChannels + c) << 2) >> 2];  /* !!! FIXME: why are these shifts here? */
-            }
-        }
-    }, buf, buflen / framelen);
-/* *INDENT-ON* */ /* clang-format on */
-}
-
-static void HandleAudioProcess(_THIS)
-{
+    SDL_AudioDevice *this = (SDL_AudioDevice *)userData;
     SDL_AudioCallback callback = this->callbackspec.callback;
     const int stream_len = this->callbackspec.size;
+    float *float_buf;
 
     /* Only do something if audio is enabled */
     if (!SDL_AtomicGet(&this->enabled) || SDL_AtomicGet(&this->paused)) {
@@ -64,9 +44,8 @@ static void HandleAudioProcess(_THIS)
             SDL_ClearAudioStream(this->stream);
         }
 
-        SDL_memset(this->work_buffer, this->spec.silence, this->spec.size);
-        FeedAudioDevice(this, this->work_buffer, this->spec.size);
-        return;
+        SDL_memset(outputs[0].data, this->spec.silence, this->spec.size);
+        return EM_TRUE;
     }
 
     if (this->stream == NULL) { /* no conversion necessary. */
@@ -90,8 +69,52 @@ static void HandleAudioProcess(_THIS)
         }
     }
 
-    FeedAudioDevice(this, this->work_buffer, this->spec.size);
+    float_buf = (float *)this->work_buffer;
+    for(int i = 0; i < this->spec.channels; ++i) {
+        for(int j = 0; j < 128; ++j) {
+            outputs[0].data[i * 128 + j] = float_buf[j * this->spec.channels + i];
+        }
+    }
+
+    return EM_TRUE;
 }
+
+static void AudioWorkletProcessorCreated(EMSCRIPTEN_WEBAUDIO_T audioContext, EM_BOOL success, void *userData)
+{
+    SDL_AudioDevice *this = (SDL_AudioDevice *)userData;
+    EMSCRIPTEN_AUDIO_WORKLET_NODE_T wasmAudioWorklet;
+    int outputChannelCounts[1] = { this->spec.channels };
+
+    EmscriptenAudioWorkletNodeCreateOptions options = {
+        .numberOfInputs = 0,
+        .numberOfOutputs = 1,
+        .outputChannelCounts = outputChannelCounts
+    };
+
+    if (!success) return;
+
+    /* Create node */
+    wasmAudioWorklet = emscripten_create_wasm_audio_worklet_node(audioContext, "SDL3", &options, &AudioWorkletProcess, this);
+
+    /* Connect it to audio context destination */
+    MAIN_THREAD_EM_ASM({emscriptenGetAudioObject($0).connect(emscriptenGetAudioObject($1).destination)}, wasmAudioWorklet, audioContext);
+}
+
+static void AudioThreadInitialized(EMSCRIPTEN_WEBAUDIO_T audioContext, EM_BOOL success, void *userData)
+{
+    WebAudioWorkletProcessorCreateOptions opts = {
+        .name = "SDL3",
+    };
+
+    if (!success) return;
+
+    emscripten_create_wasm_audio_worklet_processor_async(audioContext, &opts, &AudioWorkletProcessorCreated, userData);
+}
+
+/* !!! FIXME: this currently expects that the audio callback runs in the main thread,
+   !!! FIXME:  in intervals when the application isn't running, but that may not be
+   !!! FIXME:  true always once pthread support becomes widespread. Revisit this code
+   !!! FIXME:  at some point and see what needs to be done for that! */
 
 static void HandleCaptureProcess(_THIS)
 {
@@ -201,6 +224,7 @@ static int EMSCRIPTENAUDIO_OpenDevice(_THIS, const char *devname)
     SDL_AudioFormat test_format;
     SDL_bool iscapture = this->iscapture;
     int result;
+    EMSCRIPTEN_WEBAUDIO_T context;
 
     /* based on parts of library_sdl.js */
 
@@ -235,6 +259,12 @@ static int EMSCRIPTENAUDIO_OpenDevice(_THIS, const char *devname)
         return SDL_SetError("Web Audio API is not available!");
     }
 
+    /* TODO: emscripten_create_audio_context*/
+    context = MAIN_THREAD_EM_ASM_INT({
+        var SDL3 = Module['SDL3'];
+        return emscriptenRegisterAudioObject(SDL3.audioContext);
+    });
+
     for (test_format = SDL_GetFirstAudioFormat(this->spec.format); test_format; test_format = SDL_GetNextAudioFormat()) {
         switch (test_format) {
         case AUDIO_F32: /* web audio only supports floats */
@@ -267,6 +297,11 @@ static int EMSCRIPTENAUDIO_OpenDevice(_THIS, const char *devname)
         var SDL3 = Module['SDL3'];
         return SDL3.audioContext.sampleRate;
     });
+
+    if (!iscapture) {
+         /* AudioWorklet frames are always 128 samples */
+        this->spec.samples = 128;
+    }
 
     SDL_CalculateAudioSpec(&this->spec);
 
@@ -330,17 +365,7 @@ static int EMSCRIPTENAUDIO_OpenDevice(_THIS, const char *devname)
             }
         }, this->spec.channels, this->spec.samples, HandleCaptureProcess, this);
     } else {
-        /* setup a ScriptProcessorNode */
-        MAIN_THREAD_EM_ASM({
-            var SDL3 = Module['SDL3'];
-            SDL3.audio.scriptProcessorNode = SDL3.audioContext['createScriptProcessor']($1, 0, $0);
-            SDL3.audio.scriptProcessorNode['onaudioprocess'] = function (e) {
-                if ((SDL3 === undefined) || (SDL3.audio === undefined)) { return; }
-                SDL3.audio.currentOutputBuffer = e['outputBuffer'];
-                dynCall('vi', $2, [$3]);
-            };
-            SDL3.audio.scriptProcessorNode['connect'](SDL3.audioContext['destination']);
-        }, this->spec.channels, this->spec.samples, HandleAudioProcess, this);
+        emscripten_start_wasm_audio_worklet_thread_async(context, audioThreadStack, sizeof(audioThreadStack), &AudioThreadInitialized, this);
     }
 /* *INDENT-ON* */ /* clang-format on */
 
