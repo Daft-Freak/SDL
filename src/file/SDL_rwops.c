@@ -158,8 +158,10 @@ static Sint64 SDLCALL windows_file_size(SDL_RWops *context)
     if (!context || context->hidden.windowsio.h == INVALID_HANDLE_VALUE) {
         return SDL_SetError("windows_file_size: invalid context/file not opened");
     }
+    
+    size.LowPart = GetFileSize(context->hidden.windowsio.h, (DWORD *)&size.HighPart);
 
-    if (!GetFileSizeEx(context->hidden.windowsio.h, &size)) {
+    if (size.LowPart == INVALID_FILE_SIZE && GetLastError() != NO_ERROR) {
         return WIN_SetError("windows_file_size");
     }
 
@@ -196,7 +198,8 @@ static Sint64 SDLCALL windows_file_seek(SDL_RWops *context, Sint64 offset, int w
     }
 
     windowsoffset.QuadPart = offset;
-    if (!SetFilePointerEx(context->hidden.windowsio.h, windowsoffset, &windowsoffset, windowswhence)) {
+    windowsoffset.LowPart = SetFilePointer(context->hidden.windowsio.h, windowsoffset.LowPart, &windowsoffset.HighPart, windowswhence);
+    if (windowsoffset.LowPart == INVALID_SET_FILE_POINTER && GetLastError() != NO_ERROR) {
         return WIN_SetError("windows_file_seek");
     }
     return windowsoffset.QuadPart;
@@ -280,7 +283,8 @@ windows_file_write(SDL_RWops *context, const void *ptr, size_t size,
     if (context->hidden.windowsio.append) {
         LARGE_INTEGER windowsoffset;
         windowsoffset.QuadPart = 0;
-        if (!SetFilePointerEx(context->hidden.windowsio.h, windowsoffset, &windowsoffset, FILE_END)) {
+        windowsoffset.LowPart = SetFilePointer(context->hidden.windowsio.h, windowsoffset.LowPart, &windowsoffset.HighPart, FILE_END);
+        if (windowsoffset.LowPart == INVALID_SET_FILE_POINTER && GetLastError() != NO_ERROR) {
             SDL_Error(SDL_EFWRITE);
             return 0;
         }
