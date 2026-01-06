@@ -31,9 +31,9 @@
 #ifndef STRICT
 #define STRICT 1
 #endif
-#ifndef UNICODE
-#define UNICODE 1
-#endif
+//#ifndef UNICODE
+//#define UNICODE 1
+//#endif
 #undef WINVER
 #undef _WIN32_WINNT
 #if SDL_VIDEO_RENDER_D3D12
@@ -93,6 +93,10 @@
 #include <basetyps.h> /* for REFIID with broken mingw.org headers */
 
 #include "SDL_rect.h"
+
+#ifndef UNICODE
+#define UNICODE 0
+#endif
 
 /* Routines to convert from UTF8 to native Windows text */
 #define WIN_StringToUTF8W(S) SDL_iconv_string("UTF-8", "UTF-16LE", (const char *)(S), (SDL_wcslen(S) + 1) * sizeof(WCHAR))
