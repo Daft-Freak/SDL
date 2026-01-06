@@ -44,8 +44,10 @@ static int main_getcmdline(void)
 
     argvw = CommandLineToArgvW(GetCommandLineW(), &argc);
     if (!argvw) {
-        return OutOfMemory();
-    }
+        argc = 0;
+        argv = NULL;
+        //return OutOfMemory();
+    } else {
 
     /* Note that we need to be careful about how we allocate/free memory here.
      * If the application calls SDL_SetMemoryFunctions(), we can't rely on
@@ -73,6 +75,7 @@ static int main_getcmdline(void)
     }
     argv[i] = NULL;
     LocalFree(argvw);
+    }
 
     SDL_SetMainReady();
 
