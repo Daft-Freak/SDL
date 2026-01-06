@@ -626,11 +626,13 @@ static int WINDOWS_JoystickGetDeviceSteamVirtualGamepadSlot(int device_index)
     for (index = device_index; index > 0; index--) {
         device = device->pNext;
     }
-
+#ifdef SDL_JOYSTICK_XINPUT
     if (device->bXInputDevice) {
         /* The slot for XInput devices can change as controllers are seated */
         return SDL_XINPUT_GetSteamVirtualGamepadSlot(device->XInputUserId);
-    } else {
+    } else
+#endif
+    {
         return device->steam_virtual_gamepad_slot;
     }
 }
