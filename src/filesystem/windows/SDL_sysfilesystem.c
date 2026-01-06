@@ -106,8 +106,10 @@ char *SDL_GetPrefPath(const char *org, const char *app)
     if (!org) {
         org = "";
     }
-
-    if (!SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_APPDATA | CSIDL_FLAG_CREATE, NULL, 0, path))) {
+    
+    // substituting My Documents for AppData
+    if(!SHGetSpecialFolderPathW(NULL, path, CSIDL_PERSONAL, TRUE)) {
+    //if (!SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_APPDATA | CSIDL_FLAG_CREATE, NULL, 0, path))) {
         WIN_SetError("Couldn't locate our prefpath");
         return NULL;
     }
