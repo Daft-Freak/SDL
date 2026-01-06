@@ -338,7 +338,8 @@ static void WIN_AddDisplay(_THIS, HMONITOR hMonitor, const MONITORINFOEX *info, 
     displaydata->IsValid = SDL_TRUE;
 
     SDL_zero(display);
-    display.name = WIN_GetDisplayNameVista(_this->driverdata, info->szDevice);
+    // stack corruption in EnumDisplayDevices?
+    /*display.name = WIN_GetDisplayNameVista(_this->driverdata, info->szDevice);
     if (!display.name) {
         DISPLAY_DEVICEW device;
         SDL_zero(device);
@@ -346,7 +347,7 @@ static void WIN_AddDisplay(_THIS, HMONITOR hMonitor, const MONITORINFOEX *info, 
         if (EnumDisplayDevicesW(info->szDevice, 0, &device, 0)) {
             display.name = WIN_StringToUTF8W(device.DeviceString);
         }
-    }
+    }*/
 
     display.desktop_mode = mode;
     display.current_mode = mode;
