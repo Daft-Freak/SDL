@@ -1380,7 +1380,7 @@ int WIN_SetWindowHitTest(SDL_Window *window, SDL_bool enabled)
 
 int WIN_SetWindowOpacity(_THIS, SDL_Window *window, float opacity)
 {
-#if defined(__XBOXONE__) || defined(__XBOXSERIES__)
+#if defined(__XBOXONE__) || defined(__XBOXSERIES__) || 1
     return -1;
 #else
     const SDL_WindowData *data = (SDL_WindowData *)window->driverdata;
