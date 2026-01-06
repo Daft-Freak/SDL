@@ -679,7 +679,7 @@ static int WIN_ShowOldMessageBox(const SDL_MessageBoxData *messageboxdata, int *
     HFONT DialogFont;
     SIZE Size;
     RECT TextSize;
-    wchar_t *wmessage;
+    TCHAR *wmessage;
     TEXTMETRIC TM;
     HDC FontDC;
     INT_PTR result;
@@ -776,9 +776,9 @@ static int WIN_ShowOldMessageBox(const SDL_MessageBoxData *messageboxdata, int *
     }
 
     /* Measure the *pixel* size of the string. */
-    wmessage = WIN_UTF8ToStringW(messageboxdata->message);
+    wmessage = WIN_UTF8ToString(messageboxdata->message);
     SDL_zero(TextSize);
-    DrawTextW(FontDC, wmessage, -1, &TextSize, DT_CALCRECT | DT_LEFT | DT_NOPREFIX | DT_EDITCONTROL);
+    DrawText(FontDC, wmessage, -1, &TextSize, DT_CALCRECT | DT_LEFT | DT_NOPREFIX | DT_EDITCONTROL);
 
     /* Add margins and some padding for hangs, etc. */
     TextSize.left += TextMargin;

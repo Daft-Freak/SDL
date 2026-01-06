@@ -1009,7 +1009,7 @@ int WIN_SetWindowGammaRamp(_THIS, SDL_Window * window, const Uint16 * ramp)
     HDC hdc;
     BOOL succeeded = FALSE;
 
-    hdc = CreateDCW(data->DeviceName, NULL, NULL, NULL);
+    hdc = CreateDC(data->DeviceName, NULL, NULL, NULL);
     if (hdc) {
         succeeded = SetDeviceGammaRamp(hdc, (LPVOID)ramp);
         if (!succeeded) {
@@ -1027,7 +1027,7 @@ void WIN_UpdateWindowICCProfile(SDL_Window * window, SDL_bool send_event)
     SDL_DisplayData *displaydata = display ? (SDL_DisplayData *)display->driverdata : NULL;
 
     if (displaydata) {
-        HDC hdc = CreateDCW(displaydata->DeviceName, NULL, NULL, NULL);
+        HDC hdc = CreateDC(displaydata->DeviceName, NULL, NULL, NULL);
         if (hdc) {
             WCHAR fileName[MAX_PATH];
             DWORD fileNameSize = SDL_arraysize(fileName);
@@ -1055,7 +1055,7 @@ void *WIN_GetWindowICCProfile(_THIS, SDL_Window *window, size_t *size)
     char *filename_utf8;
     void *iccProfileData = NULL;
 
-    filename_utf8 = WIN_StringToUTF8(data->ICMFileName);
+    filename_utf8 = WIN_StringToUTF8W(data->ICMFileName);
     if (filename_utf8) {
         iccProfileData = SDL_LoadFile(filename_utf8, size);
         if (!iccProfileData) {
@@ -1075,7 +1075,7 @@ int WIN_GetWindowGammaRamp(_THIS, SDL_Window * window, Uint16 * ramp)
     HDC hdc;
     BOOL succeeded = FALSE;
 
-    hdc = CreateDCW(data->DeviceName, NULL, NULL, NULL);
+    hdc = CreateDC(data->DeviceName, NULL, NULL, NULL);
     if (hdc) {
         succeeded = GetDeviceGammaRamp(hdc, (LPVOID)ramp);
         if (!succeeded) {

@@ -105,11 +105,13 @@
 #define WIN_UTF8ToString WIN_UTF8ToStringW
 #define SDL_tcslen       SDL_wcslen
 #define SDL_tcsstr       SDL_wcsstr
+#define SDL_tcscmp       SDL_wcscmp
 #else
 #define WIN_StringToUTF8 WIN_StringToUTF8A
 #define WIN_UTF8ToString WIN_UTF8ToStringA
 #define SDL_tcslen       SDL_strlen
 #define SDL_tcsstr       SDL_strstr
+#define SDL_tcscmp       SDL_strcmp
 #endif
 
 /* Set up for C function definitions, even when using C++ */
