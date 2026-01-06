@@ -1132,11 +1132,10 @@ int SDL_GetSystemRAM(void)
 #endif
 #if defined(__WIN32__) || defined(__GDK__)
         if (SDL_SystemRAM <= 0) {
-            MEMORYSTATUSEX stat;
+            MEMORYSTATUS stat;
             stat.dwLength = sizeof(stat);
-            if (GlobalMemoryStatusEx(&stat)) {
-                SDL_SystemRAM = (int)(stat.ullTotalPhys / (1024 * 1024));
-            }
+            GlobalMemoryStatus(&stat);
+            SDL_SystemRAM = (int)(stat.dwTotalPhys / (1024 * 1024));
         }
 #endif
 #ifdef __OS2__
